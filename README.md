@@ -1,4 +1,4 @@
-# Proyecto Final: Análisis de retrasos y cancelaciones de vuelos
+# Proyecto Final: Análisis del desempeño operativo de los vuelos domésticos de American Airlines, con énfasis en retrasos, cancelaciones y desvíos
 
 **Curso:** Business Intelligence
 
