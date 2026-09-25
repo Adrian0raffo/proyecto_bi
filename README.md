@@ -192,6 +192,211 @@ El diccionario de la fuente describe los campos originales utilizados durante la
 | `SECURITY_DELAY` | SMALLINT | Minutos de retraso por motivos de seguridad | Sí |
 | `LATE_AIRCRAFT_DELAY` | SMALLINT | Minutos de retraso porque la aeronave llegó tarde de su vuelo anterior | Sí |
 
+## 3.4. Diseño del Data Mart
+
+A partir de los campos identificados en la fuente de datos se diseñó el Data Mart que será utilizado como estructura de destino para el proceso ETL. El modelo organiza la información operacional de los vuelos mediante una tabla de hechos central y ocho dimensiones relacionadas directamente con ella.
+
+La granularidad definida es de **un registro por cada vuelo programado**. Por lo tanto, cada fila de `FactOperacionVuelo` representa una operación de vuelo individual y contiene tanto las claves que permiten relacionarla con sus dimensiones como las medidas necesarias para analizar su desempeño.
+
+Para las dimensiones se utilizan claves sustitutas generadas dentro del Data Mart. Estas claves permiten identificar de forma única cada registro dimensional sin depender directamente de las claves utilizadas en la fuente de origen.
+
+### 3.4.1. Diagrama del Data Mart
+
+La estructura final del Data Mart se presenta en el siguiente diagrama:
+
+![Diagrama del Data Mart](datamart.png)
+
+El modelo está compuesto por la tabla de hechos `FactOperacionVuelo` y las siguientes ocho dimensiones:
+
+1. `DimFecha`
+2. `DimHora`
+3. `DimAeropuerto`
+4. `DimRuta`
+5. `DimAvion`
+6. `DimVuelo`
+7. `DimEstadoOperacion`
+8. `DimCausaCancelacion`
+
+Todas las dimensiones se relacionan directamente con `FactOperacionVuelo`, manteniendo la estructura de un esquema estrella.
+
+`DimHora` desempeña dos roles dentro del modelo, ya que se utiliza para representar la hora programada de salida y la hora programada de llegada. De manera similar, `DimAeropuerto` se utiliza tanto para el aeropuerto de origen como para el aeropuerto de destino. Por este motivo, la tabla de hechos contiene dos claves foráneas hacia cada una de estas dimensiones.
+
+---
+
+### 3.4.2. FactOperacionVuelo
+
+`FactOperacionVuelo` constituye la tabla central del Data Mart. Su granularidad corresponde a un vuelo programado y concentra las claves foráneas de las dimensiones junto con las medidas operativas utilizadas para el análisis de retrasos, cancelaciones, desvíos, tiempos y distancias.
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `OperacionVueloKey` | BIGINT | Clave primaria sustituta de la tabla de hechos. |
+| `FechaKey` | INT | Clave foránea hacia `DimFecha`. |
+| `HoraSalidaProgramadaKey` | INT | Clave foránea hacia `DimHora` para la hora programada de salida. |
+| `HoraLlegadaProgramadaKey` | INT | Clave foránea hacia `DimHora` para la hora programada de llegada. |
+| `AeropuertoOrigenKey` | INT | Clave foránea hacia `DimAeropuerto` para el aeropuerto de origen. |
+| `AeropuertoDestinoKey` | INT | Clave foránea hacia `DimAeropuerto` para el aeropuerto de destino. |
+| `RutaKey` | INT | Clave foránea hacia `DimRuta`. |
+| `AvionKey` | INT | Clave foránea hacia `DimAvion`. |
+| `VueloKey` | INT | Clave foránea hacia `DimVuelo`. |
+| `EstadoOperacionKey` | INT | Clave foránea hacia `DimEstadoOperacion`. |
+| `CausaCancelacionKey` | INT | Clave foránea hacia `DimCausaCancelacion`. Puede ser nula cuando el vuelo no fue cancelado. |
+| `DEP_DELAY` | SMALLINT | Diferencia en minutos entre la salida real y la programada. |
+| `DEP_DELAY_NEW` | SMALLINT | Minutos de retraso en salida, considerando como cero los valores negativos. |
+| `DEP_DEL15` | BIT | Indica si el retraso de salida fue de 15 minutos o más. |
+| `DEP_DELAY_GROUP` | SMALLINT | Agrupación del retraso de salida en intervalos de 15 minutos. |
+| `ARR_DELAY` | SMALLINT | Diferencia en minutos entre la llegada real y la programada. |
+| `ARR_DELAY_NEW` | SMALLINT | Minutos de retraso en llegada, considerando como cero los valores negativos. |
+| `ARR_DEL15` | BIT | Indica si el retraso de llegada fue de 15 minutos o más. |
+| `ARR_DELAY_GROUP` | SMALLINT | Agrupación del retraso de llegada en intervalos de 15 minutos. |
+| `TAXI_OUT` | SMALLINT | Minutos transcurridos desde la salida de la puerta hasta el despegue. |
+| `TAXI_IN` | SMALLINT | Minutos transcurridos desde el aterrizaje hasta la llegada a la puerta. |
+| `CRS_ELAPSED_TIME` | SMALLINT | Duración programada del vuelo en minutos. |
+| `ACTUAL_ELAPSED_TIME` | SMALLINT | Duración real del vuelo en minutos. |
+| `AIR_TIME` | SMALLINT | Tiempo efectivo de vuelo en minutos. |
+| `FLIGHTS` | TINYINT | Contador de vuelos; toma el valor 1 por cada operación. |
+| `DISTANCE` | SMALLINT | Distancia de la operación en millas. |
+| `CARRIER_DELAY` | SMALLINT | Minutos de demora atribuibles a la aerolínea. |
+| `WEATHER_DELAY` | SMALLINT | Minutos de demora asociados al clima extremo. |
+| `NAS_DELAY` | SMALLINT | Minutos de demora asociados al Sistema Nacional de Aviación. |
+| `SECURITY_DELAY` | SMALLINT | Minutos de demora asociados a seguridad. |
+| `LATE_AIRCRAFT_DELAY` | SMALLINT | Minutos de demora ocasionados por la llegada tardía de la aeronave anterior. |
+| `DEP_TIME` | CHAR(4) | Hora real de salida. |
+| `WHEELS_OFF` | CHAR(4) | Hora de despegue. |
+| `WHEELS_ON` | CHAR(4) | Hora de aterrizaje. |
+| `ARR_TIME` | CHAR(4) | Hora real de llegada. |
+| `CANCELLED` | BIT | Indica si el vuelo fue cancelado. |
+| `DIVERTED` | BIT | Indica si el vuelo fue desviado. |
+
+---
+
+### 3.4.3. DimFecha
+
+`DimFecha` proporciona el contexto temporal de cada operación y permite realizar análisis por año, trimestre, mes, día del mes y día de la semana.
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `FechaKey` | INT | Clave primaria sustituta de la dimensión. |
+| `FL_DATE` | DATE | Fecha completa del vuelo. |
+| `YEAR` | SMALLINT | Año correspondiente al vuelo. |
+| `QUARTER` | TINYINT | Trimestre del año. |
+| `MONTH` | TINYINT | Mes del año. |
+| `DAY_OF_MONTH` | TINYINT | Día del mes. |
+| `DAY_OF_WEEK` | TINYINT | Día de la semana. |
+
+La dimensión permite establecer una jerarquía temporal de año → trimestre → mes → día.
+
+---
+
+### 3.4.4. DimHora
+
+`DimHora` permite analizar las operaciones según la hora y la franja horaria en la que fueron programadas.
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `HoraKey` | INT | Clave primaria sustituta de la dimensión. |
+| `HoraCompleta` | CHAR(4) | Hora completa en formato HHMM. |
+| `Hora` | TINYINT | Componente correspondiente a la hora. |
+| `Minuto` | TINYINT | Componente correspondiente a los minutos. |
+| `FranjaHoraria` | NVARCHAR(50) | Franja horaria utilizada para agrupar las operaciones. |
+
+Esta dimensión se utiliza dos veces desde `FactOperacionVuelo`: `HoraSalidaProgramadaKey` representa la salida programada y `HoraLlegadaProgramadaKey` representa la llegada programada.
+
+---
+
+### 3.4.5. DimAeropuerto
+
+`DimAeropuerto` almacena los atributos descriptivos de los aeropuertos involucrados en las operaciones.
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `AeropuertoKey` | INT | Clave primaria sustituta de la dimensión. |
+| `AIRPORT_ID` | INT | Identificador del aeropuerto proveniente de la fuente. |
+| `AIRPORT_CODE` | NCHAR(10) | Código del aeropuerto. |
+| `CITY_NAME` | NVARCHAR(100) | Ciudad donde se encuentra el aeropuerto. |
+| `STATE_ABR` | NCHAR(10) | Abreviatura del estado. |
+| `STATE_NM` | NVARCHAR(50) | Nombre del estado. |
+
+La dimensión cumple dos roles dentro del modelo. `AeropuertoOrigenKey` identifica el aeropuerto desde el cual parte el vuelo y `AeropuertoDestinoKey` identifica el aeropuerto al cual se dirige.
+
+---
+
+### 3.4.6. DimRuta
+
+`DimRuta` representa la combinación de origen y destino correspondiente a una operación y permite realizar análisis a nivel de ruta.
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `RutaKey` | INT | Clave primaria sustituta de la dimensión. |
+| `RUTA` | NVARCHAR(50) | Identificación de la ruta del vuelo. |
+| `DISTANCE_GROUP` | SMALLINT | Grupo de distancia de la ruta. |
+
+La distancia exacta se conserva como medida en `FactOperacionVuelo`, mientras que `DISTANCE_GROUP` permite clasificar las rutas según rangos de distancia.
+
+---
+
+### 3.4.7. DimAvion
+
+`DimAvion` identifica la aeronave utilizada en cada operación.
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `AvionKey` | INT | Clave primaria sustituta de la dimensión. |
+| `TAIL_NUM` | NVARCHAR(50) | Matrícula de la aeronave. |
+
+`TAIL_NUM` puede presentar valores nulos en la fuente de datos.
+
+---
+
+### 3.4.8. DimVuelo
+
+`DimVuelo` representa el número de vuelo asignado por la aerolínea.
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `VueloKey` | INT | Clave primaria sustituta de la dimensión. |
+| `OP_CARRIER_FL_NUM` | INT | Número de vuelo de la operación. |
+
+---
+
+### 3.4.9. DimEstadoOperacion
+
+`DimEstadoOperacion` permite clasificar el resultado general de la operación del vuelo.
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `EstadoOperacionKey` | INT | Clave primaria sustituta de la dimensión. |
+| `EstadoOperacion` | NVARCHAR(50) | Estado correspondiente a la operación del vuelo. |
+
+Esta dimensión permite distinguir las diferentes situaciones operativas definidas durante la transformación de los datos.
+
+---
+
+### 3.4.10. DimCausaCancelacion
+
+`DimCausaCancelacion` permite incorporar una descripción comprensible del motivo por el cual un vuelo fue cancelado.
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `CausaCancelacionKey` | INT | Clave primaria sustituta de la dimensión. |
+| `CANCELLATION_CODE` | CHAR(1) | Código de la causa de cancelación proveniente de la fuente. |
+| `DescripcionCancelacion` | NVARCHAR(20) | Descripción asociada a la causa de cancelación. |
+
+La relación con esta dimensión es opcional, ya que solamente los vuelos cancelados presentan una causa de cancelación.
+
+---
+
+### 3.4.11. Relaciones del modelo
+
+Todas las dimensiones se relacionan directamente con `FactOperacionVuelo` mediante relaciones de uno a muchos (1:N). Un registro de una dimensión puede estar asociado a múltiples operaciones de vuelo, mientras que cada clave foránea de la tabla de hechos identifica un registro específico de su dimensión correspondiente.
+
+Dos dimensiones cumplen más de un rol:
+
+- `DimHora` se relaciona mediante `HoraSalidaProgramadaKey` y `HoraLlegadaProgramadaKey`.
+- `DimAeropuerto` se relaciona mediante `AeropuertoOrigenKey` y `AeropuertoDestinoKey`.
+
+Esta estructura permite reutilizar una misma dimensión para conceptos que comparten los mismos atributos, evitando duplicar información dentro del Data Mart.
+
+
 ## Bibliografía
 
 Bureau of Transportation Statistics. (s. f.). *Reporting carrier on-time performance (1987–present)*. U.S. Department of Transportation. [https://www.transtats.bts.gov/DL_SelectFields.aspx?QO_fu146_anzr=b0-gvzr&gnoyr_VQ=FGJ](https://www.transtats.bts.gov/DL_SelectFields.aspx?QO_fu146_anzr=b0-gvzr&gnoyr_VQ=FGJ)
