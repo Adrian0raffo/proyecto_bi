@@ -192,19 +192,19 @@ El diccionario de la fuente describe los campos originales utilizados durante la
 | `SECURITY_DELAY` | SMALLINT | Minutos de retraso por motivos de seguridad | Sí |
 | `LATE_AIRCRAFT_DELAY` | SMALLINT | Minutos de retraso porque la aeronave llegó tarde de su vuelo anterior | Sí |
 
-## 3.4. Diseño del Data Mart
+## 3.4. Diseño del Datamart
 
-A partir de los campos identificados en la fuente de datos se diseñó el Data Mart que será utilizado como estructura de destino para el proceso ETL. El modelo organiza la información operacional de los vuelos mediante una tabla de hechos central y ocho dimensiones relacionadas directamente con ella.
+A partir de los campos identificados en la fuente de datos se diseñó el Datamart que será utilizado como estructura de destino para el proceso ETL. El modelo organiza la información operacional de los vuelos mediante una tabla de hechos central y ocho dimensiones relacionadas directamente con ella.
 
 La granularidad definida es de **un registro por cada vuelo programado**. Por lo tanto, cada fila de `FactOperacionVuelo` representa una operación de vuelo individual y contiene tanto las claves que permiten relacionarla con sus dimensiones como las medidas necesarias para analizar su desempeño.
 
-Para las dimensiones se utilizan claves sustitutas generadas dentro del Data Mart. Estas claves permiten identificar de forma única cada registro dimensional sin depender directamente de las claves utilizadas en la fuente de origen.
+Para las dimensiones se utilizan claves sustitutas generadas dentro del Datamart. Estas claves permiten identificar de forma única cada registro dimensional sin depender directamente de las claves utilizadas en la fuente de origen.
 
-### 3.4.1. Diagrama del Data Mart
+### 3.4.1. Diagrama del Datamart
 
-La estructura final del Data Mart se presenta en el siguiente diagrama:
+La estructura final del Datamart se presenta en el siguiente diagrama:
 
-![Diagrama del Data Mart](datamart.png)
+![Diagrama del Datamart](datamart.png)
 
 El modelo está compuesto por la tabla de hechos `FactOperacionVuelo` y las siguientes ocho dimensiones:
 
@@ -225,7 +225,7 @@ Todas las dimensiones se relacionan directamente con `FactOperacionVuelo`, mante
 
 ### 3.4.2. FactOperacionVuelo
 
-`FactOperacionVuelo` constituye la tabla central del Data Mart. Su granularidad corresponde a un vuelo programado y concentra las claves foráneas de las dimensiones junto con las medidas operativas utilizadas para el análisis de retrasos, cancelaciones, desvíos, tiempos y distancias.
+`FactOperacionVuelo` constituye la tabla central del Datamart. Su granularidad corresponde a un vuelo programado y concentra las claves foráneas de las dimensiones junto con las medidas operativas utilizadas para el análisis de retrasos, cancelaciones, desvíos, tiempos y distancias.
 
 | Campo | Tipo | Descripción |
 |---|---|---|
@@ -394,7 +394,7 @@ Dos dimensiones cumplen más de un rol:
 - `DimHora` se relaciona mediante `HoraSalidaProgramadaKey` y `HoraLlegadaProgramadaKey`.
 - `DimAeropuerto` se relaciona mediante `AeropuertoOrigenKey` y `AeropuertoDestinoKey`.
 
-Esta estructura permite reutilizar una misma dimensión para conceptos que comparten los mismos atributos, evitando duplicar información dentro del Data Mart.
+Esta estructura permite reutilizar una misma dimensión para conceptos que comparten los mismos atributos, evitando duplicar información dentro del Datamart.
 
 
 ## Bibliografía
